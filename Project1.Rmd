@@ -1,0 +1,86 @@
+---
+title: "Reproducible Research: Project 1, Activity Data"
+output: 
+  html_document:
+    keep_md: true
+---
+
+
+## Loading and preprocessing the data
+```{r, echo=T}
+data <- read.csv(file="activity.csv", colClasses = c("numeric","character", "numeric"))
+head(data)
+data$date <- as.Date(data$date,"%Y-%m-%d")
+```
+
+## Histogram and Mean total number of steps taken per day
+```{r, echo=T}
+dailySteps <- with(data,aggregate(steps,by=list(date=data$date), sum,na.rm = T))
+AvgDailySteps <- mean(dailySteps$x)
+MedianDailySteps <- median(dailySteps$x)
+hist(dailySteps$x, main = "Histogram total number of daily steps", xlab = "Total number of daily steps", breaks =10)
+```
+
+The median number of steps taken daily is: `r as.integer(MedianDailySteps)`
+
+The mean number of steps taken daily is: `r as.integer(AvgDailySteps)`
+
+## The average daily activity pattern
+```{r, echo=T}
+dailyPattern <- with(data,aggregate(steps,by=list(interval=data$interval), mean,na.rm = T))
+maxInterval=dailyPattern$interval[which.max(dailyPattern$x)]
+dailyPattern$interval=dailyPattern$interval/100
+with(dailyPattern, plot(interval, x, xlab= "interval(min)", ylab="Avg steps", type="l"))
+```
+
+Maximum steps interval is: `r floor(maxInterval/100)` : `r maxInterval%%100` 
+
+
+## Imputing missing values
+
+Total Number of rows that have NA data: `r sum(complete.cases(data)==0)`
+All the NA data is in steps column.
+Imputing the data:
+```{r, echo=T}
+NumNARows <- sum(complete.cases(data)==0)
+library(mice)
+md.pattern(data, plot=T)
+imputedData <- mice(data, method="pmm",m=1)
+completeData <- complete(imputedData,1)
+```
+
+Calculate average and median daily steps and show the histogram:
+
+```{r, echo=T}
+dailyStepsC <- with(completeData,aggregate(steps,by=list(date=data$date), sum,na.rm = T))
+AvgDailyStepsC <- mean(dailyStepsC$x)
+MedianDailyStepsC <- median(dailyStepsC$x)
+
+hist(dailyStepsC$x, xlab = "Total number of daily steps", breaks =10, main = "Histogram daily steps, imputed data")
+```
+
+
+The median number of steps taken daily (imputed) is: `r as.integer(MedianDailyStepsC)`
+
+The mean number of steps taken daily (imputed) is: `r as.integer(AvgDailyStepsC)`
+
+The median is the same as the original data, but the mean has changenged slightly.
+
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+Check which dates are a weekday and ones are weeked days:
+```{r, echo=T}
+isweekend <- as.factor(weekdays(completeData$date) %in% c("Saturday","Sunday"))
+newData <- cbind(completeData,isweekend)
+avg_weekday <- aggregate(newData$steps,by=list(isweekend=newData$isweekend, interval=newData$interval),mean)
+avg_weekday$wday <-factor(avg_weekday$isweekend,labels = c("weekday","weekend"))
+```
+
+Plot the average number of steps for weed days and weekend days.
+
+```{r, echo=T}
+library(ggplot2)
+g <- ggplot(avg_weekday,aes(interval,x))
+g+geom_line()+facet_grid(avg_weekday$wday~.)+labs(y="Avg Steps")
+```
